@@ -1,0 +1,46 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.required-field::after {
+    content: " *";
+    color: red;
+}
+
+#form-empresa .form-control:invalid, 
+#form-empresa .form-select:invalid {
+    border-color: #dc3545;
+}
+
+#form-empresa .form-control.is-invalid, 
+#form-empresa .form-select.is-invalid {
+    border-color: #dc3545;
+}
+
+/* Responsividade para formulários */
+@media (max-width: 768px) {
+    .form-row > .col, 
+    .form-row > [class*="col-"] {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Estilo para cards de visualização */
+.card-empresa {
+    border-left: 4px solid #0d6efd;
+}
+
+.card-empresa .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+}
+
+/* Paginação */
+.pagination .page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
