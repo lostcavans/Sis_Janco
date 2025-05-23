@@ -11,6 +11,8 @@ $mensagem = '';
 $nfeId = null;
 $nfe = null;
 $itens = [];
+$emitente = null;
+$destinatario = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -37,17 +39,25 @@ if (isset($_GET['id'])) {
     try {
         $nfe = $controller->getNFe($nfeId);
         $itens = $controller->getItensNFe($nfeId);
+        
+        // Obtém dados das empresas
+        $emitente = $controller->getDadosEmpresa($nfe['cnpj_emitente']);
+        $destinatario = $controller->getDadosEmpresa($nfe['cnpj_destinatario']);
+        
     } catch (Exception $e) {
-        $mensagem = $e->getMessage();
+        $mensagem = [
+            'tipo' => 'danger',
+            'texto' => $e->getMessage()
+        ];
     }
 }
 
-// Mensagens da sessão
-if (isset($_SESSION['mensagem'])) {
-    $mensagem = $_SESSION['mensagem'];
-    $tipoMensagem = $_SESSION['tipo_mensagem'];
-    unset($_SESSION['mensagem']);
-    unset($_SESSION['tipo_mensagem']);
+
+// Exibe mensagens específicas do processamento da NFe
+if (isset($nfe['mensagens'])) {
+    foreach ($nfe['mensagens'] as $msg) {
+        echo '<div class="alert alert-'.$msg['tipo'].'">'.$msg['texto'].'</div>';
+    }
 }
 ?>
 
@@ -62,24 +72,94 @@ if (isset($_SESSION['mensagem'])) {
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 </head>
 <body>
-    <?php include __DIR__ . '/../../views/partials/header.php'; ?>
+    <?php include __DIR__ . '/../partials/header.php'; ?>
     
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2><i class="fas fa-calculator me-2"></i>Cálculo de Substituição Tributária</h2>
-            <a href="<?= BASE_URL ?>/index.php class="btn btn-outline-secondary">
+            <a href="<?= BASE_URL ?>/index.php" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i> Voltar
             </a>
         </div>
         
         <?php if ($mensagem): ?>
-            <div class="alert alert-<?= $tipoMensagem ?? 'danger' ?> alert-dismissible fade show">
-                <?= $mensagem ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
+    <div class="alert alert-<?= is_array($mensagem) ? $mensagem['tipo'] : ($tipoMensagem ?? 'danger') ?> alert-dismissible fade show">
+        <?= is_array($mensagem) ? $mensagem['texto'] : $mensagem ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
         
         <?php if ($nfe): ?>
+        <!-- Seção de Empresas -->
+        <div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-building"></i> Emitente
+                    <?php if ($emitente): ?>
+                        <span class="badge bg-success float-end">Cadastrado</span>
+                    <?php else: ?>
+                        <span class="badge bg-warning text-dark float-end">Não encontrado</span>
+                    <?php endif; ?>
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Razão Social:</strong> <?= htmlspecialchars($nfe['nome_emitente']) ?></p>
+                <p><strong>CNPJ:</strong> <?= htmlspecialchars($nfe['cnpj_emitente']) ?></p>
+                
+                <?php if ($emitente): ?>
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-check-circle"></i> Esta empresa já está cadastrada em nosso sistema
+                    </div>
+                    <a href="empresas.php?acao=editar&id=<?= $emitente['id'] ?>" 
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-eye"></i> Ver cadastro completo
+                    </a>
+                <?php else: ?>
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i> Empresa não encontrada no cadastro
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-building"></i> Destinatário
+                    <?php if ($destinatario): ?>
+                        <span class="badge bg-success float-end">Cadastrado</span>
+                    <?php else: ?>
+                        <span class="badge bg-warning text-dark float-end">Não encontrado</span>
+                    <?php endif; ?>
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Razão Social:</strong> <?= htmlspecialchars($nfe['nome_destinatario']) ?></p>
+                <p><strong>CNPJ:</strong> <?= htmlspecialchars($nfe['cnpj_destinatario']) ?></p>
+                
+                <?php if ($destinatario): ?>
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-check-circle"></i> Esta empresa já está cadastrada em nosso sistema
+                    </div>
+                    <a href="empresas.php?acao=editar&id=<?= $destinatario['id'] ?>" 
+                       class="btn btn-sm btn-outline-info">
+                        <i class="fas fa-eye"></i> Ver cadastro completo
+                    </a>
+                <?php else: ?>
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-exclamation-triangle"></i> Empresa não encontrada no cadastro
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+        
+        <!-- Seção de Cálculo -->
         <div class="row">
             <div class="col-md-6">
                 <div class="card shadow-sm mb-4">
@@ -118,22 +198,22 @@ if (isset($_SESSION['mensagem'])) {
             
             <div class="col-md-6">
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-info text-white">
+                    <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informações da NFe</h5>
                     </div>
                     <div class="card-body">
-                        <p><strong>Número:</strong> <?= $nfe['numero'] ?></p>
+                        <p><strong>Número:</strong> <?= htmlspecialchars($nfe['numero']) ?></p>
                         <p><strong>Data Emissão:</strong> <?= date('d/m/Y H:i', strtotime($nfe['data_emissao'])) ?></p>
-                        <p><strong>Emitente:</strong> <?= $nfe['nome_emitente'] ?></p>
-                        <p><strong>CNPJ Emitente:</strong> <?= $nfe['cnpj_emitente'] ?></p>
                         <p><strong>Valor Total:</strong> R$ <?= number_format($nfe['valor_total'], 2, ',', '.') ?></p>
+                        <p><strong>Chave de Acesso:</strong> <?= htmlspecialchars($nfe['chave_acesso']) ?></p>
                     </div>
                 </div>
             </div>
         </div>
         
+        <!-- Tabela de Itens -->
         <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
+            <div class="card-header bg-warning text-dark">
                 <h5 class="mb-0"><i class="fas fa-list me-2"></i>Itens da NFe</h5>
             </div>
             <div class="card-body">
@@ -154,8 +234,8 @@ if (isset($_SESSION['mensagem'])) {
                             <?php foreach ($itens as $item): ?>
                             <tr>
                                 <td><?= $item['numero_item'] ?></td>
-                                <td><?= $item['descricao'] ?></td>
-                                <td><?= $item['ncm'] ?></td>
+                                <td><?= htmlspecialchars($item['descricao']) ?></td>
+                                <td><?= htmlspecialchars($item['ncm']) ?></td>
                                 <td><?= number_format($item['quantidade'], 4, ',', '.') ?></td>
                                 <td>R$ <?= number_format($item['valor_unitario'], 4, ',', '.') ?></td>
                                 <td>R$ <?= number_format($item['valor_total'], 2, ',', '.') ?></td>

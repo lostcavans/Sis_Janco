@@ -1,4 +1,8 @@
 <?php
+if (!isset($empresa)) {
+    echo '<div class="alert alert-danger">Empresa não encontrada</div>';
+    return;
+}
 /**
  * Formulário de edição de empresa
  * 

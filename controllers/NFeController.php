@@ -33,6 +33,25 @@ class NFeController {
         return $nfeId;
     }
 
+    public function getEmpresaByCnpj($cnpj) {
+    $stmt = $this->pdo->prepare("
+        SELECT * FROM empresas WHERE cnpj = ?
+    ");
+    $stmt->execute([$cnpj]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+// controllers/NFeController.php
+
+public function getDadosEmpresa($cnpj) {
+    $stmt = $this->pdo->prepare("
+        SELECT id, razao_social, nome_fantasia, ie, logradouro, numero, bairro,
+               municipio, uf, cep, telefone, email
+        FROM empresas 
+        WHERE cnpj = ?
+    ");
+    $stmt->execute([$cnpj]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
     public function calcularST($nfeId, $aliquotaInterna, $mvaOriginal, $mvaCNAE = null) {
         return $this->processor->calcularST($nfeId, $aliquotaInterna, $mvaOriginal, $mvaCNAE);
     }

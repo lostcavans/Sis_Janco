@@ -28,8 +28,83 @@ class NFeProcessor {
         // Extrai itens e impostos
         $this->extractItens();
 
+        // Extrai e registra empresas
+        $this->processarEmpresas();
+
         return $this->nfeData;
     }
+
+    private function extractEmpresas() {
+    $infNFe = $this->xml->NFe->infNFe;
+    
+    // Processa emitente
+    $emitente = [
+        'cnpj' => (string)$infNFe->emit->CNPJ,
+        'razao_social' => (string)$infNFe->emit->xNome,
+        'nome_fantasia' => isset($infNFe->emit->xFant) ? (string)$infNFe->emit->xFant : null,
+        'ie' => (string)$infNFe->emit->IE,
+        'logradouro' => (string)$infNFe->emit->enderEmit->xLgr,
+        'numero' => (string)$infNFe->emit->enderEmit->nro,
+        'bairro' => (string)$infNFe->emit->enderEmit->xBairro,
+        'municipio' => (string)$infNFe->emit->enderEmit->xMun,
+        'uf' => (string)$infNFe->emit->enderEmit->UF,
+        'cep' => (string)$infNFe->emit->enderEmit->CEP,
+        'telefone' => isset($infNFe->emit->fone) ? (string)$infNFe->emit->fone : null
+    ];
+
+    // Processa destinatário
+    $destinatario = [
+        'cnpj' => (string)$infNFe->dest->CNPJ,
+        'razao_social' => (string)$infNFe->dest->xNome,
+        'ie' => (string)$infNFe->dest->IE,
+        'logradouro' => (string)$infNFe->dest->enderDest->xLgr,
+        'numero' => (string)$infNFe->dest->enderDest->nro,
+        'bairro' => (string)$infNFe->dest->enderDest->xBairro,
+        'municipio' => (string)$infNFe->dest->enderDest->xMun,
+        'uf' => (string)$infNFe->dest->enderDest->UF,
+        'cep' => (string)$infNFe->dest->enderDest->CEP,
+        'telefone' => isset($infNFe->dest->fone) ? (string)$infNFe->dest->fone : null
+    ];
+
+    // Verifica e cadastra empresas
+    $this->cadastrarEmpresa($emitente);
+    $this->cadastrarEmpresa($destinatario);
+}
+
+private function cadastrarEmpresa($dados) {
+    // Verifica se já existe
+    $stmt = $this->pdo->prepare("SELECT id FROM empresas WHERE cnpj = ?");
+    $stmt->execute([$dados['cnpj']]);
+    $empresa = $stmt->fetch();
+
+    if ($empresa) {
+        $this->nfeData['empresas_existentes'][] = $dados['cnpj'];
+        return $empresa['id'];
+    }
+
+    // Cadastra nova empresa
+    $stmt = $this->pdo->prepare("INSERT INTO empresas 
+        (cnpj, razao_social, nome_fantasia, ie, logradouro, numero, bairro, 
+         municipio, uf, cep, telefone, situacao_cadastral, data_cadastro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Ativa', NOW())");
+    
+    $stmt->execute([
+        $dados['cnpj'],
+        $dados['razao_social'],
+        $dados['nome_fantasia'],
+        $dados['ie'],
+        $dados['logradouro'],
+        $dados['numero'],
+        $dados['bairro'],
+        $dados['municipio'],
+        $dados['uf'],
+        $dados['cep'],
+        $dados['telefone']
+    ]);
+
+    $this->nfeData['empresas_novas'][] = $dados['cnpj'];
+    return $this->pdo->lastInsertId();
+}
 
     private function extractNFeData() {
         $infNFe = $this->xml->NFe->infNFe;
@@ -128,6 +203,87 @@ class NFeProcessor {
 
         return $impostos;
     }
+
+    private function processarEmpresas() {
+    $infNFe = $this->xml->NFe->infNFe;
+    
+    // Processa emitente
+    $emitente = $this->extrairDadosEmpresa($infNFe->emit, 'emitente');
+    $this->registrarEmpresa($emitente);
+    
+    // Processa destinatário
+    $destinatario = $this->extrairDadosEmpresa($infNFe->dest, 'destinatario');
+    $this->registrarEmpresa($destinatario);
+}
+
+private function extrairDadosEmpresa($dadosXml, $tipo) {
+    return [
+        'tipo' => $tipo,
+        'cnpj' => (string)$dadosXml->CNPJ,
+        'razao_social' => (string)$dadosXml->xNome,
+        'nome_fantasia' => isset($dadosXml->xFant) ? (string)$dadosXml->xFant : null,
+        'ie' => (string)$dadosXml->IE,
+        'logradouro' => (string)$dadosXml->enderEmit->xLgr ?? (string)$dadosXml->enderDest->xLgr,
+        'numero' => (string)$dadosXml->enderEmit->nro ?? (string)$dadosXml->enderDest->nro,
+        'bairro' => (string)$dadosXml->enderEmit->xBairro ?? (string)$dadosXml->enderDest->xBairro,
+        'municipio' => (string)$dadosXml->enderEmit->xMun ?? (string)$dadosXml->enderDest->xMun,
+        'uf' => (string)$dadosXml->enderEmit->UF ?? (string)$dadosXml->enderDest->UF,
+        'cep' => (string)$dadosXml->enderEmit->CEP ?? (string)$dadosXml->enderDest->CEP,
+        'telefone' => isset($dadosXml->fone) ? (string)$dadosXml->fone : null,
+        'email' => isset($dadosXml->email) ? (string)$dadosXml->email : null
+    ];
+}
+
+
+private function registrarEmpresa($dados) {
+    // Verifica se já existe
+    $stmt = $this->pdo->prepare("SELECT id FROM empresas WHERE cnpj = ?");
+    $stmt->execute([$dados['cnpj']]);
+    
+    if ($stmt->fetch()) {
+        $this->nfeData['mensagens'][] = [
+            'tipo' => 'info',
+            'texto' => "Empresa {$dados['tipo']} ({$dados['cnpj']}) já cadastrada"
+        ];
+        return false;
+    }
+    
+    // Cadastra nova empresa
+    try {
+        $stmt = $this->pdo->prepare("INSERT INTO empresas 
+            (cnpj, razao_social, nome_fantasia, ie, logradouro, numero, bairro,
+             municipio, uf, cep, telefone, email, situacao_cadastral, porte, data_cadastro)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Ativa', 'DEMAIS', NOW())");
+        
+        $stmt->execute([
+            $dados['cnpj'],
+            $dados['razao_social'],
+            $dados['nome_fantasia'],
+            $dados['ie'],
+            $dados['logradouro'],
+            $dados['numero'],
+            $dados['bairro'],
+            $dados['municipio'],
+            $dados['uf'],
+            $dados['cep'],
+            $dados['telefone'],
+            $dados['email']
+        ]);
+        
+        $this->nfeData['mensagens'][] = [
+            'tipo' => 'success',
+            'texto' => "Nova empresa {$dados['tipo']} cadastrada: {$dados['razao_social']}"
+        ];
+        return true;
+        
+    } catch (PDOException $e) {
+        $this->nfeData['mensagens'][] = [
+            'tipo' => 'danger',
+            'texto' => "Erro ao cadastrar empresa {$dados['tipo']}: " . $e->getMessage()
+        ];
+        return false;
+    }
+}
 
     public function saveToDatabase() {
         try {

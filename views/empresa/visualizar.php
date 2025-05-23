@@ -1,4 +1,8 @@
 <?php
+if (!isset($empresa) || !$empresa) {
+    echo '<div class="alert alert-danger">Empresa não encontrada</div>';
+    return;
+}
 /**
  * Vista de visualização de empresa
  * 

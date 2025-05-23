@@ -142,5 +142,3 @@ unset($_SESSION['resultados_impostos']);
 unset($_SESSION['dados_formulario']);
 
 ?>
-<!-- Footer -->
-    <?php include 'views/partials/footer.php'; ?>

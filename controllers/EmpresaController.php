@@ -1,5 +1,5 @@
 <?php
-require_once 'EmpresaModel.php';
+require_once __DIR__ . '/../EmpresaModel.php';
 
 class EmpresaController {
     private $model;
@@ -60,7 +60,7 @@ class EmpresaController {
         
 
 
-        $conteudo = $this->carregarView('empresa/listar');
+        $conteudo = $this->carregarView('listar');
 // Debug: verifique a primeira empresa retornada
     if (!empty($this->dadosView['empresas'])) {
         error_log(print_r($this->dadosView['empresas'][0], true));
@@ -110,31 +110,29 @@ $cnpj = filter_input(INPUT_GET, 'cnpj', FILTER_DEFAULT);
 }
     
     public function editar($id) {
-    // Obtener datos de la empresa
     $empresa = $this->model->buscarEmpresaPorId($id);
     
     if (!$empresa) {
         $_SESSION['mensagem'] = 'Empresa não encontrada!';
         $_SESSION['tipo_mensagem'] = 'danger';
-        header("Location: index.php?acao=listar");
+        header("Location: " . BASE_URL . "/index.php?acao=listar");
         exit;
     }
 
     $this->dadosView['titulo'] = 'Editar Empresa: ' . $empresa['razao_social'];
     $this->dadosView['empresa'] = $empresa;
     
-    // Si es POST, procesar el formulario
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dados = $this->validarDados($_POST);
         
         if ($dados && $this->model->atualizarEmpresa($id, $dados)) {
             $_SESSION['mensagem'] = 'Empresa atualizada com sucesso!';
             $_SESSION['tipo_mensagem'] = 'success';
-            header("Location: index.php?acao=visualizar&id=" . $id);
+            header("Location: " . BASE_URL . "/index.php?acao=visualizar&id=" . $id);
             exit;
         } else {
             $this->dadosView['erro'] = "Erro ao atualizar empresa!";
-            $this->dadosView['dados_form'] = $_POST; // Guardar datos del formulario para repoblar
+            $this->dadosView['dados_form'] = $_POST;
         }
     }
     
@@ -205,28 +203,31 @@ $cnpj = filter_input(INPUT_GET, 'cnpj', FILTER_DEFAULT);
 }
 
     private function carregarView($view) {
-    // Limpa qualquer buffer anterior
-    while (ob_get_level() > 0) {
-        ob_end_clean();
+    $possiveisCaminhos = [
+        dirname(__DIR__, 2) . '/views/empresa/' . basename($view) . '.php',
+        __DIR__ . '/../views/empresa/' . basename($view) . '.php',
+        'C:/xampp/htdocs/Cadastro_de_empresas/views/empresa/' . basename($view) . '.php'
+    ];
+    
+    foreach ($possiveisCaminhos as $caminho) {
+        if (file_exists($caminho)) {
+            ob_start();
+            extract($this->dadosView);
+            include $caminho;
+            return ob_get_clean();
+        }
     }
     
-    // Inicia novo buffer
-    ob_start();
-    
-    // Extrai variáveis para a view
-    extract($this->dadosView);
-    
-    // Inclui a view específica
-    require "views/{$view}.php";
-    
-    // Retorna o conteúdo capturado
-    return ob_get_clean();
+    throw new Exception("View não encontrada em nenhum destes locais: " . implode(', ', $possiveisCaminhos));
 }
 
-    // No EmpresaController.php
-public static function formatarDataHora($dataHora) {
-    if (empty($dataHora)) return '-';
-    return date('d/m/Y H:i:s', strtotime($dataHora));
+public function getDadosEmpresa($cnpj) {
+    try {
+        return $this->model->buscarEmpresaPorCnpj($cnpj);
+    } catch (Exception $e) {
+        error_log("Erro ao buscar empresa por CNPJ: " . $e->getMessage());
+        return null;
+    }
 }
 
 
